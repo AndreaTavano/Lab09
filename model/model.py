@@ -54,17 +54,7 @@ class Model:
                 escursione.punti_interesse.add(punto)
                 punto.escursioni.add(escursione)
 
-    def genera_pacchetto(self, id_parco: str, max_giorni: int = None, max_budget: float = None):
-        """
-        Calcola il pacchetto di escursioni ottimale per un parco rispettando i vincoli di durata, budget e punti di interesse unici.
-        :param id_parco: id del parco
-        :param max_giorni: numero massimo di giorni (può essere None --> nessun limite)
-        :param max_budget: costo massimo del pacchetto (può essere None --> nessun limite)
-
-        :return: self._pacchetto_ottimo (una lista di oggetti Escursione)
-        :return: self._costo (il costo del pacchetto)
-        :return: self._valore_ottimo (il voto complessivo dei visitatori per il pacchetto)
-        """
+    def genera_pacchetto(self, id_parco, max_giorni , max_budget):
         self._pacchetto_ottimo = []
         self._costo = 0
         self._valore_ottimo = -1
@@ -74,19 +64,27 @@ class Model:
             if escursione.id_parco == id_parco:
                 escursioni_valide.append(escursione)
 
-        self._ricorsione(start_index=0, pacchetto_parziale=[], durata_corrente=0, costo_corrente=0.0, valore_corrente=0, punti_usati=set(), escursioni_valide=escursioni_valide, max_giorni=max_giorni, max_budget=max_budget)
+        self._ricorsione(
+            pacchetto_parziale=[],
+            durata_corrente=0,
+            costo_corrente=0.0,
+            valore_corrente=0,
+            punti_usati=set(),
+            escursioni_rimanenti=escursioni_valide,
+            max_giorni=max_giorni,
+            max_budget=max_budget
+        )
 
         return self._pacchetto_ottimo, self._costo, self._valore_ottimo
 
-    def _ricorsione(self, start_index, pacchetto_parziale, durata_corrente,costo_corrente, valore_corrente, punti_usati,escursioni_valide, max_giorni, max_budget):
-        """ Algoritmo di ricorsione che deve trovare il pacchetto che massimizza il voto complessivo dei visitatori"""
+    def _ricorsione(self, pacchetto_parziale, durata_corrente, costo_corrente, valore_corrente, punti_usati, escursioni_rimanenti, max_giorni, max_budget):
         if valore_corrente > self._valore_ottimo:
             self._valore_ottimo = valore_corrente
             self._costo = costo_corrente
             self._pacchetto_ottimo = list(pacchetto_parziale)
 
-        for i in range(start_index, len(escursioni_valide)):
-            candidata = escursioni_valide[i]
+        for i in range(len(escursioni_rimanenti)):
+            candidata = escursioni_rimanenti[i]
 
             if max_budget is not None and (costo_corrente + candidata.costo) > max_budget:
                 continue
@@ -94,21 +92,21 @@ class Model:
             if max_giorni is not None and (durata_corrente + candidata.durata_giorni) > max_giorni:
                 continue
 
-            if not candidata.punti_interesse.isdisjoint(punti_usati):
+            if len(candidata.punti_interesse & punti_usati) > 0:
                 continue
 
             pacchetto_parziale.append(candidata)
             voto_aggiuntivo = sum(p.voto_visitatori for p in candidata.punti_interesse)
-            nuovi_punti_usati = punti_usati.union(candidata.punti_interesse)
+            nuovi_punti_usati = punti_usati | candidata.punti_interesse
+            nuove_rimanenti = escursioni_rimanenti[i + 1:]
 
             self._ricorsione(
-                start_index=i + 1,
                 pacchetto_parziale=pacchetto_parziale,
                 durata_corrente=durata_corrente + candidata.durata_giorni,
                 costo_corrente=costo_corrente + candidata.costo,
                 valore_corrente=valore_corrente + voto_aggiuntivo,
                 punti_usati=nuovi_punti_usati,
-                escursioni_valide=escursioni_valide,
+                escursioni_rimanenti=nuove_rimanenti,
                 max_giorni=max_giorni,
                 max_budget=max_budget
             )
